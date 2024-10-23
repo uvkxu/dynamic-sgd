@@ -38,7 +38,7 @@ class CIFAR10:
         self.dataset_url = "https://s3.amazonaws.com/fast-ai-imageclas/cifar10.tgz"
         self.data_dir = "./data/cifar10"
 
-        # self.download_data()
+        self.download_data()
 
         self.dataset = ImageFolder(self.data_dir + "/train", transform=ToTensor())
 
