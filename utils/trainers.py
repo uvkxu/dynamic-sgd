@@ -15,6 +15,7 @@ from .poisson_sampler import poisson_sampler
 from .mu_search import mu0_search,cal_step_decay_rate
 from scipy.stats import norm
 from scipy import optimize
+from ema_pytorch import EMA
 
 class DynamicSGD(): 
     def __init__(
@@ -32,6 +33,7 @@ class DynamicSGD():
             method,
             decay_rate_sens = None, 
             decay_rate_mu = None,
+            ema=None,
             dp = True):
         if method == "sgd":
             self.optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -57,6 +59,7 @@ class DynamicSGD():
         self.test_accuracies = []
 
         self.train_losses = []
+        self.train_accuracies = []
         
         num_data = len(train_dl.dataset)
         print(f'Training_dataset length: {num_data}')
@@ -87,10 +90,10 @@ class DynamicSGD():
         self.privacy_engine.attach(self.optimizer)
 
         for epochs in range(1, epochs + 1):
-            step = self.train(step)
+            step = self.train(step, ema)
             self.test()
 
-    def train(self, step):
+    def train(self, step, ema=None):
         self.model.train()
         criterion = nn.CrossEntropyLoss()
         losses = []
@@ -134,7 +137,11 @@ class DynamicSGD():
                 
                 correct += pred.eq(target.view_as(pred)).sum().item()
                 total += target.shape[0]
+
+                if ema is not None:
+                    ema.update()
             acc = 100.0*correct/ total
+            self.train_accuracies.append(acc)
         self.train_losses.append(np.mean(losses))
         return step
 

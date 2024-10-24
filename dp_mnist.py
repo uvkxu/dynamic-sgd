@@ -12,6 +12,7 @@ from opacus import PrivacyEngine
 from utils.trainers import DynamicSGD
 import logging
 from wideresnet import WideResNet
+from ema_pytorch import EMA
 
 """
 TODO: implement Parameter averaging using EMA
@@ -83,6 +84,12 @@ device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else 
 
 
 model = WideResNet(depth=28, num_classes=10).to(device)
+ema = EMA(
+    model,
+    beta = 0.9999,              # exponential moving average factor
+    update_after_step = 100,    # only after this number of .update() calls will it start updating
+    update_every = 10,          # how often to actually update, to save on compute (updates every 10th .update() call)
+)
 
 OPTIMIZERS = {
     "SGD": optim.SGD(model.parameters(), lr=args.lr),
@@ -124,11 +131,14 @@ if __name__ == "__main__":
         args.lr,
         "sgd",
         0.3,
-        0.8
+        0.8,
+        ema
         )
     
     test_losses = dysgd.test_losses
     train_losses = dysgd.train_losses
+    test_accuracies = dysgd.test_accuracies
+    train_accuracies = dysgd.train_accuracies
 
     # Create directory for experiment
     if args.save_experiment:
@@ -142,18 +152,21 @@ if __name__ == "__main__":
             for arg, value in vars(args).items():
                 f.write(f"{arg}: {value}\n")
 
-    # Save losses to a CSV
-    if args.save_experiment:
-        loss_file = os.path.join(experiment_dir, "losses.csv")
-        with open(loss_file, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Epoch", "Train Loss", "Test Loss"])
-            for epoch, (train_loss, test_loss) in enumerate(
-                zip(train_losses, test_losses), 1
-            ):
-                writer.writerow([epoch, train_loss, test_loss])
+    # Save losses and accuracies to a CSV
+    csv_file = os.path.join(experiment_dir, "metrics.csv")
+    with open(csv_file, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Epoch", "Train Loss", "Test Loss", "Train Accuracy", "Test Accuracy"])
+        for epoch in range(1, args.epochs + 1):
+            train_loss = train_losses[epoch - 1]
+            test_loss = test_losses[epoch - 1]
+            train_accuracy = train_accuracies[epoch - 1]
+            test_accuracy = test_accuracies[epoch - 1]
+            writer.writerow([epoch, train_loss, test_loss, train_accuracy, test_accuracy])
 
-    # Plot and save the loss curves
+    plt.figure(figsize=(12, 5))
+
+    plt.subplot(1, 2, 1)
     plt.plot(range(1, args.epochs + 1), train_losses, label="Train Loss")
     plt.plot(range(1, args.epochs + 1), test_losses, label="Test Loss")
     plt.xlabel("Epoch")
@@ -161,8 +174,18 @@ if __name__ == "__main__":
     plt.legend()
     plt.title("Training and Testing Loss Curves")
 
-    if args.save_experiment:
-        plt.savefig(os.path.join(experiment_dir, "loss_curves.png"))
+    # Plot and save the accuracy curves
+    plt.subplot(1, 2, 2)
+    plt.plot(range(1, args.epochs + 1), train_accuracies, label="Train Accuracy")
+    plt.plot(range(1, args.epochs + 1), test_accuracies, label="Test Accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.title("Training and Testing Accuracy Curves")
+
+    # Save the plots as a file
+    plt.tight_layout()
+    plt.savefig(os.path.join(experiment_dir, "metrics_curves.png"))
 
     # Save model
     if args.save_experiment:
