@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn as nn
 import os
 import csv
+import matplotlib
 import matplotlib.pyplot as plt
 from datetime import datetime
 from data_handlers import CIFAR10
@@ -18,6 +19,7 @@ with https://github.com/lucidrains/ema-pytorch/tree/main/ema_pytorch
 beta = 0.9999 as said in paper Unlocking High Accuracy
 """
 
+matplotlib.use('Agg')
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -34,14 +36,14 @@ def parse_args():
 
     # Clipping thresholds for DiceSGD
     parser.add_argument(
-        "--C", default=0.5, nargs="+", type=float, help="clipping threshold"
+        "--C", default=1, nargs="+", type=float, help="clipping threshold"
     )
 
     parser.add_argument("--save_results", default=True)
     parser.add_argument("--optimizer", default="SGD")
     parser.add_argument(
         "--subset_size",
-        default=1000,
+        default=None,
         type=int,
         help="check optimizer and model capacity",
     )
@@ -50,7 +52,7 @@ def parse_args():
         "--batch_size",
         type=int,
         default=256,
-        help="input batch size for training (default: 64)",
+        help="input batch size for training (default: 256)",
     )
 
     parser.add_argument(
@@ -109,7 +111,7 @@ if __name__ == "__main__":
 
     # dr_sens = np.linspace(0.1,0.7,4)
     # dr_mus = np.linspace(0.2,0.8,4)
-    DynamicSGD(
+    dysgd = DynamicSGD(
         model,
         train_dl,
         test_dl,
@@ -124,8 +126,10 @@ if __name__ == "__main__":
         0.3,
         0.8
         )
+    
+    test_losses = dysgd.test_losses
+    train_losses = dysgd.train_losses
 
-    """
     # Create directory for experiment
     if args.save_experiment:
         current_date = datetime.now().strftime("%Y-%b-%d %Hh%Mmin")
@@ -164,4 +168,4 @@ if __name__ == "__main__":
     if args.save_experiment:
         model_path = os.path.join(experiment_dir, "model.pth")
         torch.save(model.state_dict(), model_path)
-    """
+    

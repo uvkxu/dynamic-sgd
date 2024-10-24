@@ -52,6 +52,11 @@ class DynamicSGD():
         self.decay_rate_mu = decay_rate_mu  # Mu decay rate
         self.dp = dp
         step = 0
+
+        self.test_losses = []
+        self.test_accuracies = []
+
+        self.train_losses = []
         
         num_data = len(train_dl.dataset)
         print(f'Training_dataset length: {num_data}')
@@ -130,6 +135,7 @@ class DynamicSGD():
                 correct += pred.eq(target.view_as(pred)).sum().item()
                 total += target.shape[0]
             acc = 100.0*correct/ total
+        self.train_losses.append(np.mean(losses))
         return step
 
     def test(self):
@@ -142,11 +148,15 @@ class DynamicSGD():
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 test_loss += criterion(output, target).item()  # sum up batch loss
+
                 pred = output.argmax(
                     dim=1, keepdim=True
                 )  # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
         test_loss /= len(self.test_dl.dataset)
+
+        self.test_losses.append(test_loss)
+
         print(
             "\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n".format(
                 test_loss,
@@ -155,4 +165,5 @@ class DynamicSGD():
                 100.0 * correct / len(self.test_dl.dataset),
             )
         )
+        self.test_accuracies.append(100.0 * correct / len(self.test_dl.dataset))
         return correct / len(self.test_dl.dataset)
