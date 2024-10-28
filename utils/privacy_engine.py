@@ -263,6 +263,7 @@ class PrivacyEngine:
         data_loader: DataLoader,
         noise_multiplier: float,
         max_grad_norm: Union[float, List[float]],
+        sample_rate: int = None,
         batch_first: bool = True,
         loss_reduction: str = "mean",
         poisson_sampling: bool = True,
@@ -339,7 +340,8 @@ class PrivacyEngine:
             data_loader, distributed=distributed, poisson_sampling=poisson_sampling
         )
 
-        sample_rate = 1 / len(data_loader)
+        if sample_rate is None:
+            sample_rate = 1 / len(data_loader)
         expected_batch_size = int(len(data_loader.dataset) * sample_rate)
 
         optimizer = self._prepare_optimizer(
@@ -369,6 +371,7 @@ class PrivacyEngine:
         target_delta: float,
         epochs: int,
         max_grad_norm: float,
+        sample_rate: int = None,
         batch_first: bool = True,
         loss_reduction: str = "mean",
         noise_generator=None,
@@ -420,7 +423,8 @@ class PrivacyEngine:
                 equivalent to the original data loader, possibly with updated
                 sampling mechanism. Points to the same dataset object.
         """
-        sample_rate = 1 / len(data_loader)
+        if sample_rate is None:
+            sample_rate = 1 / len(data_loader)
 
         if len(self.accountant) > 0:
             warnings.warn(
@@ -461,7 +465,6 @@ class PrivacyEngine:
 
     def set_clip(self,new_clip):
         self.max_grad_norm = new_clip
-        self.clipper.norm_clipper.flat_value = new_clip
 
     def set_unit_sigma(self,unit_sigma):
         self.noise_multiplier = unit_sigma

@@ -8,9 +8,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from datetime import datetime
 from data_handlers import CIFAR10
-from opacus import PrivacyEngine
 from utils.trainers import DynamicSGD
-import logging
 from wideresnet import WideResNet
 from ema_pytorch import EMA
 
@@ -35,13 +33,19 @@ def parse_args():
         help="algorithm (ClipSGD, EFSGD, DPSGD, DiceSGD)",
     )
 
+    parser.add_argument(
+        "--optimizer",
+        default="sgd",
+        type=str,
+        help="optimizer you want for the training: sgd, adam, rmsprop",
+    )
+
     # Clipping thresholds for DiceSGD
     parser.add_argument(
         "--C", default=1, nargs="+", type=float, help="clipping threshold"
     )
 
     parser.add_argument("--save_results", default=True)
-    parser.add_argument("--optimizer", default="SGD")
     parser.add_argument(
         "--subset_size",
         default=None,
@@ -91,14 +95,6 @@ ema = EMA(
     update_every = 10,          # how often to actually update, to save on compute (updates every 10th .update() call)
 )
 
-OPTIMIZERS = {
-    "SGD": optim.SGD(model.parameters(), lr=args.lr),
-    "SGDM": optim.SGD(model.parameters(), lr=args.lr, momentum=0.1),
-    "Adam": optim.Adam(model.parameters(), lr=args.lr),
-}
-
-optimizer = OPTIMIZERS[args.optimizer]
-
 
 if __name__ == "__main__":
     # for name, param in model.named_parameters():
@@ -129,7 +125,7 @@ if __name__ == "__main__":
         args.C,
         device,
         args.lr,
-        "sgd",
+        args.optimizer,
         0.3,
         0.8,
         ema
