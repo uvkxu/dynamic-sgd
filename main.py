@@ -68,7 +68,7 @@ def parse_args():
         "--epochs", type=int, default=5, help="number of epochs to train (default: 2)"
     )
     parser.add_argument(
-        "--lr", type=float, default=0.15, help="learning rate (default: 0.001)"
+        "--lr", type=float, default=0.1, help="learning rate (default: 0.01)"
     )
     parser.add_argument(
         "--cpu", action="store_true", default=False, help="force CPU training"

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from .privacy_engine2 import PrivacyEngine
+from .privacy_engine import PrivacyEngine
 from torchvision import datasets, transforms
 from tqdm import tqdm
 from .GaussianCalibrator import calibrateAnalyticGaussianMechanism
@@ -16,6 +16,7 @@ from .mu_search import mu0_search,cal_step_decay_rate
 from scipy.stats import norm
 from scipy import optimize
 from ema_pytorch import EMA
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 class DynamicSGD(): 
     def __init__(
@@ -35,14 +36,9 @@ class DynamicSGD():
             decay_rate_mu = None,
             ema=None,
             dp = True):
-        if method == "sgd":
-            self.optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-        elif method == "adam":
-            self.optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        else:
-            raise RuntimeError("Unknown Optimizer!")
-        
         self.model = model  # Model to be trained
+        self.optimizer = self.set_optimizer(method, self.model, lr)
+        
         self.train_dl = train_dl  # Training data loader
         self.test_dl = test_dl  # Testing data loader
         self.batch_size = batch_size  # Size of each batch
@@ -89,11 +85,29 @@ class DynamicSGD():
             )
         self.privacy_engine.attach(self.optimizer)
 
-        for epochs in range(1, epochs + 1):
+        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=2, verbose=True,
+                                      min_lr=0.00001)
+
+        for epoch in range(epochs):
             step = self.train(step, ema)
+            scheduler.step(self.train_losses[epoch])
             if ema is not None:
                 ema.update_model_with_ema()
             self.test()
+
+    def set_optimizer(self, method, model, lr):
+        if method == "sgd":
+            return torch.optim.SGD(model.parameters(), lr=lr)
+        elif method == "adam":
+            return torch.optim.Adam(model.parameters(), lr=lr)
+        elif method == "rmsprop":
+            return torch.optim.RMSprop(model.parameters(), lr=lr)
+        elif method == "adagrad":
+            return torch.optim.Adagrad(model.parameters(), lr=lr)
+        elif method == "adamw":
+            return torch.optim.AdamW(model.parameters(), lr=lr)
+        else:
+            raise RuntimeError("Unknown Optimizer!")
 
     def train(self, step, ema=None):
         self.model.train()
