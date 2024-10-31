@@ -64,7 +64,7 @@ class DynamicSGD():
         
         if delta is None:
             delta = 1.0/num_data
-        mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = 1, tol = 1.e-12)
+        mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = C, tol = 1.e-12)
         mu_t = math.sqrt(math.log(mu**2/(self.sampling_rate**2*self.iteration)+1))
         sigma = 1/mu_t
 
@@ -75,15 +75,15 @@ class DynamicSGD():
         if decay_rate_sens is not None:
             self.decay_rate_sens = cal_step_decay_rate(decay_rate_sens,self.iteration)
 
-        
-        self.privacy_engine = PrivacyEngine(
-                self.model,
-                sample_rate=self.sampling_rate,
-                batch_size=self.batch_size,
-                max_grad_norm=C,
-                noise_multiplier= sigma,
-            )
-        self.privacy_engine.attach(self.optimizer)
+        if dp:
+            self.privacy_engine = PrivacyEngine(
+                    self.model,
+                    sample_rate=self.sampling_rate,
+                    batch_size=self.batch_size,
+                    max_grad_norm=C,
+                    noise_multiplier= sigma,
+                )
+            self.privacy_engine.attach(self.optimizer)
 
         scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=2, verbose=True,
                                       min_lr=0.00001)
