@@ -73,6 +73,11 @@ def parse_args():
     parser.add_argument(
         "--cpu", action="store_true", default=False, help="force CPU training"
     )
+
+    parser.add_argument(
+        "--dp", type=bool, default=True, help="Train with DP (True) or without DP (False)"
+    )
+
     parser.add_argument(
         "--save_experiment",
         action="store_true",
@@ -102,6 +107,8 @@ if __name__ == "__main__":
 
         # Initialize the CIFAR10 class
     cifar10_data = CIFAR10(
+        val_size=10000,
+        batch_size=args.batch_size,
         subset_size=args.subset_size
     )
 
@@ -128,7 +135,8 @@ if __name__ == "__main__":
         args.optimizer,
         0.3,
         0.8,
-        ema
+        ema,
+        args.dp
         )
     
     test_losses = dysgd.test_losses

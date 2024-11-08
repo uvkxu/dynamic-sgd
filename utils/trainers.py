@@ -62,20 +62,20 @@ class DynamicSGD():
         self.sampling_rate = batch_size/num_data
         self.iteration = int(epochs/self.sampling_rate)
         
-        if delta is None:
-            delta = 1.0/num_data
-        mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = C, tol = 1.e-12)
-        mu_t = math.sqrt(math.log(mu**2/(self.sampling_rate**2*self.iteration)+1))
-        sigma = 1/mu_t
-
-        if decay_rate_mu is not None:
-            self.decay_rate_mu = cal_step_decay_rate(decay_rate_mu,self.iteration)
-            self.mu_0 = mu0_search(mu, self.iteration, self.decay_rate_mu, self.sampling_rate,mu_t=mu_t)
-            
-        if decay_rate_sens is not None:
-            self.decay_rate_sens = cal_step_decay_rate(decay_rate_sens,self.iteration)
-
         if dp:
+            if delta is None:
+                delta = 1.0/num_data
+            mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = C, tol = 1.e-12)
+            mu_t = math.sqrt(math.log(mu**2/(self.sampling_rate**2*self.iteration)+1))
+            sigma = 1/mu_t
+
+            if decay_rate_mu is not None:
+                self.decay_rate_mu = cal_step_decay_rate(decay_rate_mu,self.iteration)
+                self.mu_0 = mu0_search(mu, self.iteration, self.decay_rate_mu, self.sampling_rate,mu_t=mu_t)
+                
+            if decay_rate_sens is not None:
+                self.decay_rate_sens = cal_step_decay_rate(decay_rate_sens,self.iteration)
+
             self.privacy_engine = PrivacyEngine(
                     self.model,
                     sample_rate=self.sampling_rate,
@@ -85,7 +85,7 @@ class DynamicSGD():
                 )
             self.privacy_engine.attach(self.optimizer)
 
-        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=2, verbose=True,
+        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4, verbose=True,
                                       min_lr=0.00001)
 
         for epoch in range(epochs):
