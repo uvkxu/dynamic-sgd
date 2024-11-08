@@ -85,7 +85,7 @@ class DynamicSGD():
                 )
             self.privacy_engine.attach(self.optimizer)
 
-        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=4, verbose=True,
+        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=5, verbose=True,
                                       min_lr=0.00001)
 
         for epoch in range(epochs):

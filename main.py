@@ -68,7 +68,7 @@ def parse_args():
         "--epochs", type=int, default=5, help="number of epochs to train (default: 2)"
     )
     parser.add_argument(
-        "--lr", type=float, default=0.1, help="learning rate (default: 0.01)"
+        "--lr", type=float, default=0.1, help="learning rate (default: 0.1)"
     )
     parser.add_argument(
         "--cpu", action="store_true", default=False, help="force CPU training"
@@ -76,6 +76,14 @@ def parse_args():
 
     parser.add_argument(
         "--dp", type=bool, default=True, help="Train with DP (True) or without DP (False)"
+    )
+
+    parser.add_argument(
+        "--sens_decay", type=float, default=0.3, help="Set the sensitivity decay rate between 0 and 1"
+    )
+
+    parser.add_argument(
+        "--mu_decay", type=float, default=0.75, help="Set the decay rate between 0 and 1"
     )
 
     parser.add_argument(
@@ -133,8 +141,8 @@ if __name__ == "__main__":
         device,
         args.lr,
         args.optimizer,
-        0.3,
-        0.8,
+        args.sens_decay,
+        args.mu_decay,
         ema,
         args.dp
         )
