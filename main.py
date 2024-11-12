@@ -80,7 +80,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--dp", type=bool, default=True, help="Train with opacus==0.14.0 (False) or opacus==1.5.2 (True)"
+        "--new", type=bool, default=True, help="Train with opacus==0.14.0 (False) or opacus==1.5.2 (True)"
     )
 
     parser.add_argument(
