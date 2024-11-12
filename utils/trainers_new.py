@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from .privacy_engine import PrivacyEngine
+from opacus import PrivacyEngine
+from opacus.schedulers import LambdaNoise, LambdaGradClip
 from torchvision import datasets, transforms
 from tqdm import tqdm
 from .GaussianCalibrator import calibrateAnalyticGaussianMechanism
@@ -18,7 +19,7 @@ from scipy import optimize
 from ema_pytorch import EMA
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-class DynamicSGD(): 
+class DynamicSGD_new(): 
     def __init__(
             self, 
             model,
@@ -36,10 +37,10 @@ class DynamicSGD():
             decay_rate_mu = None,
             ema=None,
             dp = True):
-        self.model = model  # Model to be trained
+        self.model = model
         self.optimizer = self.set_optimizer(method, self.model, lr)
         
-        self.train_dl = train_dl  # Training data loader
+        self.train_dl = train_dl
         self.test_dl = test_dl  # Testing data loader
         self.batch_size = batch_size  # Size of each batch
         self.epsilon = epsilon  # Epsilon value for differential privacy
@@ -56,15 +57,13 @@ class DynamicSGD():
         self.train_losses = []
         self.train_accuracies = []
         
-        num_data = len(train_dl.dataset)
-        print(f'Training_dataset length: {num_data}')
+        # num_data = len(train_dl.dataset)
+        # print(f'Training_dataset length: {num_data}')
 
-        self.sampling_rate = batch_size/num_data
+        self.sampling_rate = 1/len(train_dl)
         self.iteration = int(epochs/self.sampling_rate)
         
         if dp:
-            if delta is None:
-                delta = 1.0/num_data
             mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = 1, tol = 1.e-12)
             mu_t = math.sqrt(math.log(mu**2/(self.sampling_rate**2*self.iteration)+1))
             sigma = 1/mu_t
@@ -76,14 +75,19 @@ class DynamicSGD():
             if decay_rate_sens is not None:
                 self.decay_rate_sens = cal_step_decay_rate(decay_rate_sens,self.iteration)
 
-            self.privacy_engine = PrivacyEngine(
-                    self.model,
-                    sample_rate=self.sampling_rate,
-                    batch_size=self.batch_size,
-                    max_grad_norm=C,
-                    noise_multiplier= sigma,
+            privacy_engine = PrivacyEngine()
+            self.module, self.optimizer, self.train_dl = privacy_engine.make_private(
+                module=model,
+                optimizer=self.optimizer,
+                data_loader=train_dl,
+                noise_multiplier=sigma,
+                max_grad_norm=C,
                 )
-            self.privacy_engine.attach(self.optimizer)
+            self.noise_scheduler = LambdaNoise(optimizer=self.optimizer, 
+                                               noise_lambda=lambda step: (1/sigma) * self.max_per_sample_grad_norm * (1/self.mu_0) * (self.decay_rate_mu**(step)))
+            
+            self.grad_clip_scheduler = LambdaGradClip(optimizer=self.optimizer, 
+                                                      scheduler_function=lambda step: decay_rate_sens**step)
 
         scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=5, verbose=True,
                                       min_lr=0.001)
@@ -115,49 +119,26 @@ class DynamicSGD():
         losses = []
         correct = 0 
         total = 0
-        if self.dp == False:
-            for _batch_idx, (data, target) in enumerate(tqdm(self.train_dl)):
-                data, target = data.to(self.device), target.to(self.device)
-                self.optimizer.zero_grad()
-                output = self.model(data)
-                loss = criterion(output, target)
-                loss.backward()
-                self.optimizer.step()
-                losses.append(loss.item())
-                step += 1
-                pred = output.argmax(
-                                    dim=1, keepdim=True
-                                ) 
-                correct += pred.eq(target.view_as(pred)).sum().item()
-        else:
-            if self.decay_rate_sens is not None:
-                clip = self.max_per_sample_grad_norm * (self.decay_rate_sens)**step
-                self.privacy_engine.set_clip(clip)
-            if self.decay_rate_mu is not None:
-                unit_sigma = self.max_per_sample_grad_norm * (1/self.mu_0) * (self.decay_rate_mu**(step))
-                self.privacy_engine.set_unit_sigma(unit_sigma)
-        
-            for i in tqdm(range(int(1/self.sampling_rate))):
-                data, target = poisson_sampler(self.train_dl.dataset,self.sampling_rate)
-                data, target = data.to(self.device), target.to(self.device)
-                self.optimizer.zero_grad()
-                output = self.model(data)
-                loss = criterion(output, target)
-                loss.backward()
-                self.optimizer.step()
-                losses.append(loss.item())
-                step += 1
-                pred = output.argmax(
-                                dim=1, keepdim=True
-                            ) 
-                
-                correct += pred.eq(target.view_as(pred)).sum().item()
-                total += target.shape[0]
+        for (data, target) in tqdm(self.train_dl):
+            data, target = data.to(self.device), target.to(self.device)
+            self.optimizer.zero_grad()
+            output = self.model(data)
+            loss = criterion(output, target)
+            loss.backward()
+            self.optimizer.step()
+            losses.append(loss.item())
+            step += 1
+            pred = output.argmax(
+                            dim=1, keepdim=True
+                        ) 
+            
+            correct += pred.eq(target.view_as(pred)).sum().item()
+            total += target.shape[0]
 
-                if ema is not None:
-                    ema.update()
-            acc = 100.0*correct/ total
-            self.train_accuracies.append(acc)
+            if ema is not None:
+                ema.update()
+        acc = 100.0*correct/ total
+        self.train_accuracies.append(acc)
         self.train_losses.append(np.mean(losses))
         return step
 
