@@ -40,15 +40,9 @@ class DynamicSGD():
         self.model = model
         self.optimizer = self.set_optimizer(method, self.model, lr)
         
-        self.train_dl = train_dl
         self.test_dl = test_dl  # Testing data loader
-        self.batch_size = batch_size  # Size of each batch
-        self.epsilon = epsilon  # Epsilon value for differential privacy
-        self.max_per_sample_grad_norm = C  # Some constant or hyperparameter
+        max_per_sample_grad_norm = C  # Some constant or hyperparameter
         self.device = device  # Device to train on (e.g., 'cpu' or 'cuda')
-        self.decay_rate_sens = decay_rate_sens  # Sensitivity decay rate
-        self.decay_rate_mu = decay_rate_mu  # Mu decay rate
-        self.dp = dp
         step = 0
 
         self.test_losses = []
@@ -60,20 +54,20 @@ class DynamicSGD():
         # num_data = len(train_dl.dataset)
         # print(f'Training_dataset length: {num_data}')
 
-        self.sampling_rate = 1/len(train_dl)
-        self.iteration = int(epochs/self.sampling_rate)
+        sampling_rate = 1/len(train_dl)
+        iteration = int(epochs/sampling_rate)
         
         if dp:
             mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = 1, tol = 1.e-12)
-            mu_t = math.sqrt(math.log(mu**2/(self.sampling_rate**2*self.iteration)+1))
+            mu_t = math.sqrt(math.log(mu**2/(sampling_rate**2*iteration)+1))
             sigma = 1/mu_t
 
             if decay_rate_mu is not None:
-                self.decay_rate_mu = cal_step_decay_rate(decay_rate_mu,self.iteration)
-                self.mu_0 = mu0_search(mu, self.iteration, self.decay_rate_mu, self.sampling_rate,mu_t=mu_t)
+                decay_rate_mu = cal_step_decay_rate(decay_rate_mu,iteration)
+                mu_0 = mu0_search(mu, iteration, decay_rate_mu, sampling_rate,mu_t=mu_t)
                 
             if decay_rate_sens is not None:
-                self.decay_rate_sens = cal_step_decay_rate(decay_rate_sens,self.iteration)
+                decay_rate_sens = cal_step_decay_rate(decay_rate_sens,iteration)
 
             privacy_engine = PrivacyEngine()
             self.module, self.optimizer, self.train_dl = privacy_engine.make_private(
@@ -84,17 +78,16 @@ class DynamicSGD():
                 max_grad_norm=C,
                 )
             self.noise_scheduler = LambdaNoise(optimizer=self.optimizer, 
-                                               noise_lambda=lambda step: (1/sigma) * self.max_per_sample_grad_norm * (1/self.mu_0) * (self.decay_rate_mu**(step)))
+                                               noise_lambda=lambda step: (1/sigma) * max_per_sample_grad_norm * (1/mu_0) * (decay_rate_mu**(step)))
             
             self.grad_clip_scheduler = LambdaGradClip(optimizer=self.optimizer, 
                                                       scheduler_function=lambda step: decay_rate_sens**step)
 
-        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=5, verbose=True,
-                                      min_lr=0.001)
+        # scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=5, verbose=True, min_lr=0.001)
 
         for epoch in range(epochs):
             step = self.train(step, ema)
-            scheduler.step(self.train_losses[epoch])
+            # scheduler.step(self.train_losses[epoch])
             if ema is not None:
                 ema.update_model_with_ema()
             self.test()
@@ -128,6 +121,8 @@ class DynamicSGD():
             self.optimizer.step()
             losses.append(loss.item())
             step += 1
+            self.noise_scheduler.step()
+            self.grad_clip_scheduler.step()
             pred = output.argmax(
                             dim=1, keepdim=True
                         ) 
