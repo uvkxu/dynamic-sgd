@@ -8,8 +8,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 from datetime import datetime
 from data_handlers import CIFAR10
-from utils.trainers_new import DynamicSGD_new
-from utils.trainers import DynamicSGD
+from utils.trainers_new import DynamicSGD
+# from utils.trainers import DynamicSGD
 from wideresnet import WideResNet
 from ema_pytorch import EMA
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
         # Initialize the CIFAR10 class
     cifar10_data = CIFAR10(
-        val_size=500,
+        val_size=10000,
         batch_size=args.batch_size,
         subset_size=args.subset_size
     )
@@ -134,42 +134,23 @@ if __name__ == "__main__":
 
     # dr_sens = np.linspace(0.1,0.7,4)
     # dr_mus = np.linspace(0.2,0.8,4)
-    if args.new:
-        dysgd = DynamicSGD_new(
-            model,
-            train_dl,
-            test_dl,
-            args.batch_size,
-            args.epsilon,
-            delta,
-            args.epochs,
-            args.C,
-            device,
-            args.lr,
-            args.optimizer,
-            args.sens_decay,
-            args.mu_decay,
-            ema,
-            args.dp
-            )
-    else:
-        dysgd = DynamicSGD(
-            model,
-            train_dl,
-            test_dl,
-            args.batch_size,
-            args.epsilon,
-            delta,
-            args.epochs,
-            args.C,
-            device,
-            args.lr,
-            args.optimizer,
-            args.sens_decay,
-            args.mu_decay,
-            ema,
-            args.dp
-            )
+    dysgd = DynamicSGD(
+        model,
+        train_dl,
+        test_dl,
+        args.batch_size,
+        args.epsilon,
+        delta,
+        args.epochs,
+        args.C,
+        device,
+        args.lr,
+        args.optimizer,
+        args.sens_decay,
+        args.mu_decay,
+        ema,
+        args.dp
+        )
     
     test_losses = dysgd.test_losses
     train_losses = dysgd.train_losses

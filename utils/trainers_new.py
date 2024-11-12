@@ -19,7 +19,7 @@ from scipy import optimize
 from ema_pytorch import EMA
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-class DynamicSGD_new(): 
+class DynamicSGD(): 
     def __init__(
             self, 
             model,
