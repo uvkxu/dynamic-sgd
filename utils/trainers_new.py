@@ -83,11 +83,11 @@ class DynamicSGD():
             self.grad_clip_scheduler = LambdaGradClip(optimizer=self.optimizer, 
                                                       scheduler_function=lambda step: decay_rate_sens**step)
 
-        # scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.5, patience=5, verbose=True, min_lr=0.001)
+        scheduler = ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=5, verbose=True, min_lr=0.00001)
 
         for epoch in range(epochs):
             step = self.train(step, ema)
-            # scheduler.step(self.train_losses[epoch])
+            scheduler.step(self.train_losses[epoch])
             if ema is not None:
                 ema.update_model_with_ema()
             self.test()

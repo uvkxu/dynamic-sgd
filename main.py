@@ -107,7 +107,7 @@ args = parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
 
 
-model = WideResNet(depth=16, num_classes=10, widen_factor=4).to(device) if args.model == "WideResNet" else ResNet20(num_classes=10, num_groups=16)
+model = WideResNet(depth=16, num_classes=10, widen_factor=4).to(device) if args.model == "WideResNet" else ResNet20(num_classes=10, num_groups=16).to(device)
 ema = EMA(
     model,
     beta = 0.9999,              # exponential moving average factor
