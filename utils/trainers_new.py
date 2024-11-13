@@ -103,6 +103,8 @@ class DynamicSGD():
             return torch.optim.Adagrad(model.parameters(), lr=lr)
         elif method == "adamw":
             return torch.optim.AdamW(model.parameters(), lr=lr)
+        elif method == "nadam":
+            return toch.optim.NAdam(model.parameters(), lr=lr)
         else:
             raise RuntimeError("Unknown Optimizer!")
 
