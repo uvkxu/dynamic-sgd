@@ -11,6 +11,7 @@ from data_handlers import CIFAR10
 from utils.trainers_new import DynamicSGD
 # from utils.trainers import DynamicSGD
 from wideresnet import WideResNet
+from resnet import ResNet20
 from ema_pytorch import EMA
 
 """
@@ -25,6 +26,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Train a differentially private neural network"
     )
+
+    parser.add_argument("--model", default="WideResNet")
 
     # add algorithm option
     parser.add_argument(
@@ -99,13 +102,12 @@ def parse_args():
     )
     return parser.parse_args()
 
-
 args = parse_args()
 
 device = torch.device("cuda" if torch.cuda.is_available() and not args.cpu else "cpu")
 
 
-model = WideResNet(depth=16, num_classes=10, widen_factor=4).to(device)
+model = WideResNet(depth=16, num_classes=10, widen_factor=4).to(device) if args.model == "WideResNet" else ResNet20(num_classes=10, num_groups=16)
 ema = EMA(
     model,
     beta = 0.9999,              # exponential moving average factor
