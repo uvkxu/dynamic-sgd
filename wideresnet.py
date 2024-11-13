@@ -22,13 +22,10 @@ Link to paper:
 https://arxiv.org/abs/1903.10520
 """
 
-
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from opacus.layers import DPModule
-
 
 class Conv2d(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
@@ -52,12 +49,12 @@ class BasicBlock(nn.Module):
         self.order = order
         self.bn1 = nn.GroupNorm(nb_groups, in_planes) if nb_groups else nn.Identity()
         self.relu1 = nn.ReLU()
-        self.conv1 = nn.Conv2d(
+        self.conv1 = Conv2d(
             in_planes, out_planes, kernel_size=3, stride=stride, padding=1
         )
         self.bn2 = nn.GroupNorm(nb_groups, out_planes) if nb_groups else nn.Identity()
         self.relu2 = nn.ReLU()
-        self.conv2 = nn.Conv2d(
+        self.conv2 = Conv2d(
             out_planes, out_planes, kernel_size=3, stride=1, padding=1
         )
 
@@ -72,7 +69,7 @@ class BasicBlock(nn.Module):
         )
         self.convShortcut = (
             (not self.equalInOut)
-            and nn.Conv2d(
+            and Conv2d(
                 in_planes, out_planes, kernel_size=1, stride=stride, padding=0
             )
         ) or None
@@ -102,7 +99,6 @@ class BasicBlock(nn.Module):
             out = self.conv2(self.bn2(self.relu2(out)))
         return torch.add(skip, out)
 
-
 class NetworkBlock(nn.Module):
     def __init__(
         self, nb_layers, in_planes, out_planes, block, stride, nb_groups, order
@@ -130,7 +126,6 @@ class NetworkBlock(nn.Module):
 
     def forward(self, x):
         return self.layer(x)
-
 
 class WideResNet(nn.Module):
     def __init__(
@@ -165,7 +160,7 @@ class WideResNet(nn.Module):
         n = (depth - 4) / 6
         block = BasicBlock
         # 1st conv before any network block
-        self.conv1 = nn.Conv2d(3, nChannels[0], kernel_size=3, stride=1, padding=1)
+        self.conv1 = Conv2d(3, nChannels[0], kernel_size=3, stride=1, padding=1)
         # 1st block
         self.block1 = NetworkBlock(
             n, nChannels[0], nChannels[1], block, 1, nb_groups, order1
@@ -185,7 +180,7 @@ class WideResNet(nn.Module):
         self.nChannels = nChannels[3]
         if init == 0:  # as in Deep Mind's paper
             for m in self.modules():
-                if isinstance(m, nn.Conv2d):
+                if isinstance(m, Conv2d):
                     fan_in, fan_out = nn.init._calculate_fan_in_and_fan_out(m.weight)
                     s = 1 / (max(fan_in, 1)) ** 0.5
                     nn.init.trunc_normal_(m.weight, std=s)
@@ -200,7 +195,7 @@ class WideResNet(nn.Module):
                     m.bias.data.zero_()
         if init == 1:  # old version
             for m in self.modules():
-                if isinstance(m, nn.Conv2d):
+                if isinstance(m, Conv2d):
                     nn.init.kaiming_normal_(
                         m.weight, mode="fan_out", nonlinearity="relu"
                     )
@@ -220,3 +215,5 @@ class WideResNet(nn.Module):
         out = F.avg_pool2d(out, 8)
         out = out.view(-1, self.nChannels)
         return self.fc(out)
+
+
