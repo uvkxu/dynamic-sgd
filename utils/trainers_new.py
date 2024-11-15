@@ -41,7 +41,6 @@ class DynamicSGD():
         self.optimizer = self.set_optimizer(method, self.model, lr)
         
         self.test_dl = test_dl  # Testing data loader
-        max_per_sample_grad_norm = C  # Some constant or hyperparameter
         self.device = device  # Device to train on (e.g., 'cpu' or 'cuda')
         step = 0
 
@@ -58,16 +57,14 @@ class DynamicSGD():
         iteration = int(epochs/sampling_rate)
         
         if dp:
-            mu = 1/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = max_per_sample_grad_norm, tol = 1.e-12)
+            mu = C/calibrateAnalyticGaussianMechanism(epsilon = epsilon, delta  = delta, GS = C, tol = 1.e-12)
             mu_t = math.sqrt(math.log(mu**2/(sampling_rate**2*iteration)+1))
-            sigma = 1/mu_t
 
-            if decay_rate_mu is not None:
-                decay_rate_mu = cal_step_decay_rate(decay_rate_mu,iteration)
-                mu_0 = mu0_search(mu, iteration, decay_rate_mu, sampling_rate,mu_t=mu_t)
+            decay_rate_mu = cal_step_decay_rate(decay_rate_mu,iteration)
+            mu_0 = mu0_search(mu, iteration, decay_rate_mu, sampling_rate,mu_t=mu_t)
+            sigma = C/mu_0
                 
-            if decay_rate_sens is not None:
-                decay_rate_sens = cal_step_decay_rate(decay_rate_sens,iteration)
+            decay_rate_sens = cal_step_decay_rate(decay_rate_sens,iteration)
 
             privacy_engine = PrivacyEngine()
             self.module, self.optimizer, self.train_dl = privacy_engine.make_private(
@@ -78,7 +75,7 @@ class DynamicSGD():
                 max_grad_norm=C,
                 )
             self.noise_scheduler = LambdaNoise(optimizer=self.optimizer, 
-                                               noise_lambda=lambda step: (1/sigma) * max_per_sample_grad_norm * (1/mu_0) * (decay_rate_mu**(step)))
+                                               noise_lambda=lambda step: decay_rate_mu**(step))
             
             self.grad_clip_scheduler = LambdaGradClip(optimizer=self.optimizer, 
                                                       scheduler_function=lambda step: decay_rate_sens**step)

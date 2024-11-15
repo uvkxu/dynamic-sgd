@@ -46,7 +46,7 @@ def parse_args():
 
     # Clipping thresholds for DiceSGD
     parser.add_argument(
-        "--C", default=1, nargs="+", type=float, help="clipping threshold"
+        "--C", default=1, type=float, help="clipping threshold"
     )
 
     parser.add_argument("--save_results", default=True)
